@@ -2,8 +2,8 @@ import Spreadsheet from '@/components/Spreadsheet'
 
 export default function Home() {
   return (
-    <div>
+    <main>
       <Spreadsheet />
-    </div>
+    </main>
   )
 }

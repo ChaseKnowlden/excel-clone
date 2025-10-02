@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useRef } from 'react'
 
 type Cell = string
 type SpreadsheetProps = {
@@ -21,6 +21,61 @@ export default function Spreadsheet({
   const [editing, setEditing] = useState<{ row: number; col: number } | null>(
     null
   )
+  const [colWidths, setColWidths] = useState<number[]>(Array(columns).fill(100))
+  const [rowHeights, setRowHeights] = useState<number[]>(Array(rows).fill(32))
+  const resizingCol = useRef<number | null>(null)
+  const resizingRow = useRef<number | null>(null)
+  const startX = useRef<number>(0)
+  const startY = useRef<number>(0)
+  const startWidth = useRef<number>(0)
+  const startHeight = useRef<number>(0)
+
+  // Column resizing
+  const handleResizeStart = (e: React.MouseEvent, colIdx: number) => {
+    resizingCol.current = colIdx
+    startX.current = e.clientX
+    startWidth.current = colWidths[colIdx]
+    document.addEventListener('mousemove', handleResizing)
+    document.addEventListener('mouseup', handleResizeEnd)
+  }
+
+  const handleResizing = (e: MouseEvent) => {
+    if (resizingCol.current !== null) {
+      const delta = e.clientX - startX.current
+      setColWidths((prev) => {
+        const updated = [...prev]
+        updated[resizingCol.current!] = Math.max(40, startWidth.current + delta)
+        return updated
+      })
+    }
+    if (resizingRow.current !== null) {
+      const delta = e.clientY - startY.current
+      setRowHeights((prev) => {
+        const updated = [...prev]
+        updated[resizingRow.current!] = Math.max(
+          20,
+          startHeight.current + delta
+        )
+        return updated
+      })
+    }
+  }
+
+  const handleResizeEnd = () => {
+    resizingCol.current = null
+    resizingRow.current = null
+    document.removeEventListener('mousemove', handleResizing)
+    document.removeEventListener('mouseup', handleResizeEnd)
+  }
+
+  // Row resizing
+  const handleRowResizeStart = (e: React.MouseEvent, rowIdx: number) => {
+    resizingRow.current = rowIdx
+    startY.current = e.clientY
+    startHeight.current = rowHeights[rowIdx]
+    document.addEventListener('mousemove', handleResizing)
+    document.addEventListener('mouseup', handleResizeEnd)
+  }
 
   const handleCellChange = (row: number, col: number, value: string) => {
     setData((prev) => {
@@ -39,23 +94,44 @@ export default function Spreadsheet({
             {Array.from({ length: columns }, (_, colIdx) => (
               <th
                 key={colIdx}
-                className='px-2 py-1 font-mono text-xs text-center border-b border-gray-300 bg-gray-50 dark:bg-gray-800'
+                style={{ width: colWidths[colIdx] }}
+                className='relative px-2 py-1 font-mono text-xs text-center border-b border-gray-300 bg-gray-50 dark:bg-gray-800 group'
               >
-                {String.fromCharCode(65 + colIdx)}
+                <span>{String.fromCharCode(65 + colIdx)}</span>
+                <span
+                  className='absolute right-0 top-0 h-full w-2 cursor-col-resize group-hover:bg-blue-100 dark:group-hover:bg-blue-900'
+                  onMouseDown={(e) => handleResizeStart(e, colIdx)}
+                  style={{ zIndex: 10 }}
+                ></span>
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
           {data.map((row, rowIdx) => (
-            <tr key={rowIdx}>
-              <td className='font-mono text-xs text-right pr-2 border-r border-gray-300 bg-gray-50 dark:bg-gray-800 sticky left-0'>
+            <tr
+              key={rowIdx}
+              style={{
+                height: rowHeights[rowIdx],
+                minHeight: rowHeights[rowIdx],
+              }}
+            >
+              <td className='relative font-mono text-xs text-right pr-2 border-r border-gray-300 bg-gray-50 dark:bg-gray-800 sticky left-0 select-none'>
                 {rowIdx + 1}
+                <span
+                  className='absolute left-0 bottom-0 w-full h-2 cursor-row-resize bg-transparent hover:bg-blue-100 dark:hover:bg-blue-900'
+                  onMouseDown={(e) => handleRowResizeStart(e, rowIdx)}
+                  style={{ zIndex: 10 }}
+                ></span>
               </td>
               {row.map((cell, colIdx) => (
                 <td
                   key={colIdx}
-                  className='border border-gray-200 dark:border-gray-700 px-2 py-1 min-w-[80px] h-8 focus-within:ring-2 focus-within:ring-blue-500'
+                  style={{
+                    width: colWidths[colIdx],
+                    minWidth: colWidths[colIdx],
+                  }}
+                  className='border border-gray-200 dark:border-gray-700 px-2 py-1 focus-within:ring-2 focus-within:ring-blue-500'
                   onClick={() => setEditing({ row: rowIdx, col: colIdx })}
                 >
                   {editing?.row === rowIdx && editing?.col === colIdx ? (
